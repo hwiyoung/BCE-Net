@@ -4,12 +4,6 @@
 #include <ATen/ATen.h>
 #include <ATen/cuda/CUDAContext.h>
 
-#include <THC/THC.h>
-#include <THC/THCAtomics.cuh>
-#include <THC/THCDeviceUtils.cuh>
-
-THCState *state = at::globalContext().lazyInitCUDA();
-
 // author: Charles Shang
 // https://github.com/torch/cunn/blob/master/lib/THCUNN/generic/SpatialConvolutionMM.cu
 
@@ -75,7 +69,7 @@ dcn_v2_cuda_forward(const at::Tensor &input,
     ones_T = at::transpose(ones_T, 3, 1);
     output = at::add(output, ones_T);
 
-    modulated_deformable_im2col_cuda(c10::cuda::getCurrentCUDAStream(),
+    modulated_deformable_im2col_cuda(at::cuda::getCurrentCUDAStream(),
                                  input.data_ptr<scalar_t>(),
                                  offset.data_ptr<scalar_t>(),
                                  mask.data_ptr<scalar_t>(),
@@ -107,8 +101,8 @@ std::vector<at::Tensor> dcn_v2_cuda_backward(const at::Tensor &input,
                                              int deformable_group)
 {
 
-    THArgCheck(input.is_contiguous(), 1, "input tensor has to be contiguous");
-    THArgCheck(weight.is_contiguous(), 2, "weight tensor has to be contiguous");
+    AT_ASSERTM(input.is_contiguous(), "input tensor has to be contiguous");
+    AT_ASSERTM(weight.is_contiguous(), "weight tensor has to be contiguous");
 
     AT_ASSERTM(input.is_cuda(), "input must be a CUDA tensor");
     AT_ASSERTM(weight.is_cuda(), "weight must be a CUDA tensor");
@@ -165,7 +159,7 @@ std::vector<at::Tensor> dcn_v2_cuda_backward(const at::Tensor &input,
         columns = at::matmul(weight_flat, grad_output_n_flat);
 
         // gradient w.r.t. input coordinate data
-        modulated_deformable_col2im_coord_cuda(c10::cuda::getCurrentCUDAStream(),
+        modulated_deformable_col2im_coord_cuda(at::cuda::getCurrentCUDAStream(),
                                                columns.data_ptr<scalar_t>(),
                                                input_n.data_ptr<scalar_t>(),
                                                offset_n.data_ptr<scalar_t>(),
@@ -177,7 +171,7 @@ std::vector<at::Tensor> dcn_v2_cuda_backward(const at::Tensor &input,
                                                grad_offset_n.data_ptr<scalar_t>(),
                                                grad_mask_n.data_ptr<scalar_t>());
         // gradient w.r.t. input data
-        modulated_deformable_col2im_cuda(c10::cuda::getCurrentCUDAStream(),
+        modulated_deformable_col2im_cuda(at::cuda::getCurrentCUDAStream(),
                                          columns.data_ptr<scalar_t>(),
                                          offset_n.data_ptr<scalar_t>(),
                                          mask_n.data_ptr<scalar_t>(),
@@ -188,7 +182,7 @@ std::vector<at::Tensor> dcn_v2_cuda_backward(const at::Tensor &input,
                                          grad_input_n.data_ptr<scalar_t>());
 
         // gradient w.r.t. weight, dWeight should accumulate across the batch and group
-        modulated_deformable_im2col_cuda(c10::cuda::getCurrentCUDAStream(),
+        modulated_deformable_im2col_cuda(at::cuda::getCurrentCUDAStream(),
                                          input_n.data_ptr<scalar_t>(),
                                          offset_n.data_ptr<scalar_t>(),
                                          mask_n.data_ptr<scalar_t>(),

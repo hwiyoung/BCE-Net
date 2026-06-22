@@ -4,9 +4,6 @@
 #include <ATen/ATen.h>
 //#include <ATen/cuda/CUDAContext.h>
 
-#include <TH/TH.h>
-//#include <THC/THCAtomics.cuh>
-//#include <THC/THCDeviceUtils.cuh>
 
 //extern THCState *state;
 
@@ -142,8 +139,8 @@ std::vector<at::Tensor> dcn_v2_cpu_backward(const at::Tensor &input,
                                              int deformable_group)
 {
 
-    THArgCheck(input.is_contiguous(), 1, "input tensor has to be contiguous");
-    THArgCheck(weight.is_contiguous(), 2, "weight tensor has to be contiguous");
+    AT_ASSERTM(input.is_contiguous(), "input tensor has to be contiguous");
+    AT_ASSERTM(weight.is_contiguous(), "weight tensor has to be contiguous");
 
     /*AT_ASSERTM(input.type().is_cuda(), "input must be a CUDA tensor");
     AT_ASSERTM(weight.type().is_cuda(), "weight must be a CUDA tensor");
@@ -208,35 +205,35 @@ std::vector<at::Tensor> dcn_v2_cpu_backward(const at::Tensor &input,
         columns = at::matmul(weight_flat, grad_output_n_flat);
 
         // gradient w.r.t. input coordinate data
-        modulated_deformable_col2im_coord_cpu(columns.data<scalar_t>(),
-                                               input_n.data<scalar_t>(),
-                                               offset_n.data<scalar_t>(),
-                                               mask_n.data<scalar_t>(),
+        modulated_deformable_col2im_coord_cpu(columns.data_ptr<scalar_t>(),
+                                               input_n.data_ptr<scalar_t>(),
+                                               offset_n.data_ptr<scalar_t>(),
+                                               mask_n.data_ptr<scalar_t>(),
                                                1, channels, height, width,
                                                height_out, width_out, kernel_h, kernel_w,
                                                pad_h, pad_w, stride_h, stride_w,
                                                dilation_h, dilation_w, deformable_group,
-                                               grad_offset_n.data<scalar_t>(),
-                                               grad_mask_n.data<scalar_t>());
+                                               grad_offset_n.data_ptr<scalar_t>(),
+                                               grad_mask_n.data_ptr<scalar_t>());
         // gradient w.r.t. input data
-        modulated_deformable_col2im_cpu(columns.data<scalar_t>(),
-                                         offset_n.data<scalar_t>(),
-                                         mask_n.data<scalar_t>(),
+        modulated_deformable_col2im_cpu(columns.data_ptr<scalar_t>(),
+                                         offset_n.data_ptr<scalar_t>(),
+                                         mask_n.data_ptr<scalar_t>(),
                                          1, channels, height, width,
                                          height_out, width_out, kernel_h, kernel_w,
                                          pad_h, pad_w, stride_h, stride_w,
                                          dilation_h, dilation_w, deformable_group,
-                                         grad_input_n.data<scalar_t>());
+                                         grad_input_n.data_ptr<scalar_t>());
 
         // gradient w.r.t. weight, dWeight should accumulate across the batch and group
-        modulated_deformable_im2col_cpu(input_n.data<scalar_t>(),
-                                         offset_n.data<scalar_t>(),
-                                         mask_n.data<scalar_t>(),
+        modulated_deformable_im2col_cpu(input_n.data_ptr<scalar_t>(),
+                                         offset_n.data_ptr<scalar_t>(),
+                                         mask_n.data_ptr<scalar_t>(),
                                          1, channels, height, width,
                                          height_out, width_out, kernel_h, kernel_w,
                                          pad_h, pad_w, stride_h, stride_w,
                                          dilation_h, dilation_w, deformable_group,
-                                         columns.data<scalar_t>());
+                                         columns.data_ptr<scalar_t>());
 
         // long m_ = channels_out;
         // long n_ = channels * kernel_h * kernel_w;

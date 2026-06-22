@@ -6,9 +6,6 @@
 #include <ATen/ATen.h>
 //#include <ATen/cuda/CUDAContext.h>
 
-#include <TH/TH.h>
-//#include <THC/THCAtomics.cuh>
-//#include <THC/THCDeviceUtils.cuh>
 
 // modified from the CUDA version for CPU use by Daniel K. Suhendro
 

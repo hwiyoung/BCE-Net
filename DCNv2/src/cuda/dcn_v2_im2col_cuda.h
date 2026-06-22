@@ -64,6 +64,8 @@
 #ifndef DCN_V2_IM2COL_CUDA
 #define DCN_V2_IM2COL_CUDA
 
+#include <cuda_runtime.h>
+
 #ifdef __cplusplus
 extern "C"
 {
