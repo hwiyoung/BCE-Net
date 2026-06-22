@@ -1,0 +1,22 @@
+services:
+  bcenet:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bcenet
+    image: bcenet-poc:dev
+    container_name: bcenet-poc-dev
+    working_dir: /workspace/BCE-Net
+    volumes:
+      - .:/workspace/BCE-Net
+      - ../models/BCE-Net:/workspace/models/BCE-Net:ro
+      - ../data:/workspace/data
+      - ../results:/workspace/results
+    environment:
+      PYTHONPATH: /workspace/BCE-Net:/workspace/BCE-Net/DCNv2
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    gpus: all
+    shm_size: "16gb"
+    ipc: host
+    stdin_open: true
+    tty: true
