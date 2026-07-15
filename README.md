@@ -22,7 +22,9 @@ BCE-Net consists of four parts: a pre-trained encoder for extracting robust mult
 
 ## Test
 
-+ Create an environment according to requirements.txt
++ In each fresh managed GPU container/workspace, run `make setup`. See [ENVIRONMENT.md](ENVIRONMENT.md).
++ With a persistent bind-mounted workspace, the environment can be reused. Use `./scripts/run_in_env.sh python ...` or let VS Code select the repository venv automatically.
++ The original `requirements.txt` is a legacy Windows conda export and is not used by the managed-container bootstrap.
 + Build the [DCNv2](https://github.com/CharlesShang/DCNv2/tree/master) (Deformable Convolutional Networks V2)
 + Download the trained weights at [Weights-Baiduyun](https://pan.baidu.com/s/1LjhSh3ijoxzwn8dei8Z-4g) with extract code: wyxv
 + Prepare the data and run the testXX.py， we provided a detailed description in the comments

@@ -2051,3 +2051,87 @@ Stage 8V result: pass
 
 Next stage:
 - Stage 9: real data upload and inference preparation, when real ortho/image and existing building vector are available.
+
+## Managed-Container Bootstrap Automation
+
+Date: 2026-07-15
+
+Session model:
+- A new cloud session may create a fresh provider-managed container.
+- The user cannot choose the packages installed while that container is created.
+- BCE-Net source may enter the container through either `git clone` or a volume bind mount.
+- The goal is one repeatable post-create command, not a custom base image.
+
+Bootstrap entry points:
+
+```bash
+make setup
+make verify
+./scripts/run_in_env.sh python test_model_korea.py --help
+```
+
+Implementation:
+- `scripts/setup_env.sh`: prerequisite checks, venv creation, pinned wheel installation, GPU-architecture detection, DCNv2 build, and verification.
+- `scripts/verify_env.py`: package imports, CUDA visibility, DCNv2 CUDA forward, geospatial smoke, and checkpoint-path validation.
+- `scripts/run_in_env.sh`: command execution without relying on interactive shell activation.
+- `requirements-managed.txt`: managed-container geospatial package pins.
+- `Makefile`: human-facing `setup`, `verify`, `env`, and `shell` targets.
+- `.vscode/settings.json`: repository venv selection for VS Code.
+- `ENVIRONMENT.md`: clone, volume binding, persistence, override, and troubleshooting boundaries.
+
+Base-container prerequisites:
+- Python 3.12-compatible runtime.
+- CUDA-enabled PyTorch and torchvision.
+- Visible NVIDIA GPU.
+- CUDA toolkit with `nvcc`.
+- `g++` and Python development headers.
+- Initial pip wheel download access.
+
+The bootstrap intentionally does not attempt to install or configure a host
+NVIDIA driver, container GPU runtime, or missing system CUDA toolkit. Those are
+properties of the provider-managed base container.
+
+Environment created and verified:
+- Venv: `/home/work/BCE-Net/.venv-bcenet-geo`
+- Python: `3.12.3`
+- PyTorch: `2.10.0a0+b558c986e8.nv25.11`
+- CUDA: `13.0`
+- GPU: NVIDIA H200, compute capability `9.0`
+- DCNv2 extension: `_ext.cpython-312-x86_64-linux-gnu.so`, built for `sm_90`
+- NumPy: `2.2.6`
+- rasterio: `1.5.0`
+- geopandas: `1.1.3`
+- pyogrio: `0.12.1`
+
+Verification results:
+- `make setup`: pass
+- Idempotent second `make setup`: pass; compatible DCNv2 build skipped
+- `make verify`: pass
+- DCNv2 16x16 CUDA forward: pass
+- GeoTIFF and GeoPackage read/write: pass
+- Rasterize and polygonize: pass
+- WHU checkpoint strict load: pass
+- BCE-Net 512x512 CUDA forward: pass
+- BCE-Net forward time observed: approximately `201 ms`
+- BCE-Net output finiteness: all checked outputs contained no NaN/Inf
+
+Persistence behavior:
+- Fresh clone/fresh volume: run `make setup`; packages and DCNv2 are rebuilt.
+- Persistent bind-mounted repository: venv and extension may be reused.
+- New terminal in the same container: no reinstall; use the runner or VS Code interpreter.
+- Changed base Python/PyTorch/CUDA ABI: rerun `make setup`; incompatible DCNv2 is force-rebuilt.
+
+Checkpoint path:
+- Default: `/home/work/models/BCE-Net/checkpoint-best-whu.pth`
+- Override: `BCENET_WEIGHTS=/mounted/path/checkpoint.pth make setup`
+
+Generated environment state is excluded from Git:
+- `.venv-bcenet-geo/`
+- `.setup-logs/`
+- `DCNv2/_ext*.so`
+- `DCNv2/build/`
+- weights, data, and results
+
+Bootstrap result: pass
+- A fresh compatible cloud container can be configured with one repository command.
+- A provider image without CUDA-enabled PyTorch, `nvcc`, or a C++ compiler fails early with a prerequisite error.

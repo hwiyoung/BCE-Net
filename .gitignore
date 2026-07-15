@@ -1,6 +1,7 @@
 .venv*/
 venv/
 env/
+.setup-logs/
 
 **/__pycache__/
 **/*.pyc

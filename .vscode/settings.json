@@ -1,0 +1,4 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv-bcenet-geo/bin/python",
+  "python.terminal.activateEnvironment": true
+}
