@@ -1216,7 +1216,7 @@ class Baseline34(nn.Module):
     def __init__(self, num_classes=1, num_channels=3, pretrained=False):
         super(Baseline34, self).__init__()
         filters = [64, 128, 256, 512]
-        self.resnet_features = resnet34(pretrained=True)
+        self.resnet_features = resnet34(pretrained=pretrained)
 
         self.conv4 = nn.Conv2d(512, 512, 3, padding=1, bias=False)
         self.bn4 = nn.BatchNorm2d(512)
@@ -1307,7 +1307,10 @@ class Baseline34(nn.Module):
         # d4f = self.norm4(d4f1)
         d4f = self.sel(d4f1)
 
-        d4f = self.dcn(d4f)
+        # The legacy DCNv2 extension only implements float32 kernels. Keep just
+        # the deformable convolution in FP32 so the rest of the model can use AMP.
+        with torch.autocast(device_type=d4f.device.type, enabled=False):
+            d4f = self.dcn(d4f.float())
         d4 = self.norm4(d4f)
         d4 = F.interpolate(d4, x_size[2:], mode='bilinear', align_corners=False)
         out = self.finalseg(d4)
@@ -1320,7 +1323,8 @@ class Baseline34(nn.Module):
         # mov_out = self.conv_lab2(mov_out)
 
         fu_new = self.sel(fu_new)
-        fu_new = self.dcn(fu_new)
+        with torch.autocast(device_type=fu_new.device.type, enabled=False):
+            fu_new = self.dcn(fu_new.float())
         # fu_new = self.bnorm1(fu_new)
         new_out = self.conv_lab1(fu_new)
         new_out = self.bnorm2(new_out)

@@ -29,6 +29,52 @@ BCE-Net consists of four parts: a pre-trained encoder for extracting robust mult
 + Download the trained weights at [Weights-Baiduyun](https://pan.baidu.com/s/1LjhSh3ijoxzwn8dei8Z-4g) with extract code: wyxv
 + Prepare the data and run the testXX.py， we provided a detailed description in the comments
 
+## Train on the map-ortho dataset
+
+The custom dataset uses a before ortho image, an after footprint mask, and a
+state mask with `0=background`, `1=no change`, `2=omission`, and `3=excess`.
+The generated manifest contains 800 training, 100 validation, and 100 test
+samples. Five masks without matching images are recorded in the audit report
+and excluded.
+
+The full training design, label-to-branch mapping, noisy-label strategy,
+metric interpretation, and qualitative review checklist are documented in
+[TRAINING_DESIGN.md](TRAINING_DESIGN.md).
+
+```bash
+cd /home/work/projects/BCE-Net
+
+./scripts/run_in_env.sh python scripts/prepare_map_ortho_manifest.py \
+  --data-root /home/work/data/change_detection/building/map-ortho
+
+./scripts/run_in_env.sh python train_bcenet_map_ortho.py \
+  --manifest dataset/map_ortho_manifest.csv \
+  --init-checkpoint /home/work/models/BCE-Net/checkpoint-best-whu.pth \
+  --output-dir /home/work/models/BCE-Net/map-ortho-robust-v2-20260720
+```
+
+The default training profile uses generalized cross entropy, Dice loss,
+reduced boundary weights, and reduced weights for secondary change instances
+to limit the impact of noisy labels. It selects the best checkpoint by the
+macro average of omission and excess F1 and stops when either change head
+predicts no positive pixels for three consecutive epochs.
+
+To monitor a detached training job:
+
+```bash
+./scripts/run_in_env.sh python scripts/show_bcenet_training_status.py
+tail -f /home/work/models/BCE-Net/map-ortho-robust-v2-20260720/train.log
+watch -n 2 nvidia-smi
+```
+
+Training curves are written to `training-curves.png`. Fixed omission/excess
+validation samples are rendered before training, after the first epoch, every
+five epochs, and after the final epoch under `qualitative/`.
+
+The repository-local `training_monitor/current` link exposes the active run
+inside VS Code Explorer even though checkpoints and images are stored under
+`/home/work/models`.
+
 ## Results
 <div align=center><img width="410" height="490" src="https://github.com/liaochengcsu/BCE-Net/blob/main/pics/figure12.png" title="results on sibu dataset"><img width="410" height="490" src="https://github.com/liaochengcsu/BCE-Net/blob/main/pics/figure14.png" title="results on whu-cd dataset"></div>
 

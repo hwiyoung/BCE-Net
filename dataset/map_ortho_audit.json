@@ -1,0 +1,66 @@
+{
+  "data_root": "/home/work/data/change_detection/building/map-ortho",
+  "manifest": "/home/work/projects/BCE-Net/dataset/map_ortho_manifest.csv",
+  "source_rows": 1005,
+  "usable_rows": 1000,
+  "excluded": [
+    {
+      "sample_id": "excess_00114",
+      "reason": "missing: ['/home/work/data/change_detection/building/map-ortho/image/excess_00114.png']"
+    },
+    {
+      "sample_id": "excess_00453",
+      "reason": "missing: ['/home/work/data/change_detection/building/map-ortho/image/excess_00453.png']"
+    },
+    {
+      "sample_id": "omission_00618",
+      "reason": "missing: ['/home/work/data/change_detection/building/map-ortho/image/omission_00618.png']"
+    },
+    {
+      "sample_id": "omission_00812",
+      "reason": "missing: ['/home/work/data/change_detection/building/map-ortho/image/omission_00812.png']"
+    },
+    {
+      "sample_id": "omission_01118",
+      "reason": "missing: ['/home/work/data/change_detection/building/map-ortho/image/omission_01118.png']"
+    }
+  ],
+  "invalid_value_files": 0,
+  "unique_label_patterns": {
+    "0,1,3": 287,
+    "0,1,2,3": 513,
+    "0,3": 16,
+    "0,2,3": 9,
+    "0,1,2": 172,
+    "0,2": 3
+  },
+  "pixel_totals": {
+    "0": 717544612,
+    "1": 285088928,
+    "3": 22318007,
+    "2": 23624453
+  },
+  "map_vs_label_1_or_3_mismatch_pixels": 0,
+  "spatial_block_pixels": 8192,
+  "seed": 1024,
+  "splits": {
+    "test": {
+      "samples": 100,
+      "center_omission": 43,
+      "center_excess": 57,
+      "spatial_groups": 8
+    },
+    "train": {
+      "samples": 800,
+      "center_omission": 378,
+      "center_excess": 422,
+      "spatial_groups": 53
+    },
+    "val": {
+      "samples": 100,
+      "center_omission": 44,
+      "center_excess": 56,
+      "spatial_groups": 8
+    }
+  }
+}
