@@ -60,6 +60,402 @@
 | precision/recall/F1/IoU | binary change 성능 보고 | existing, omission, excess, combined change별 계산 | 일치·확장 |
 | 논문식 ablation | RSG/ICL/DTM 기여 검증 | 아직 실행하지 않음 | 미구현 |
 
+## 3.1 현재 코드의 end-to-end 실행 구조
+
+앞의 표는 판정 요약이다. 실제 코드는 다음 순서로 실행된다.
+
+```mermaid
+flowchart LR
+    A[map_ortho_manifest.csv] --> B[MapOrthoBCENetDataset]
+    B --> C[image / reference / state label 읽기]
+    C --> D[512 crop + train augmentation]
+    D --> E[target와 quality weight 생성]
+    E --> F[Baseline34 forward]
+    F --> G[existing logit]
+    F --> H[removed/excess logit]
+    F --> I[new/omission logit]
+    F --> J[contrastive feature 2종]
+    G --> K[BCENetCriterion]
+    H --> K
+    I --> K
+    J --> K
+    E --> K
+    K --> L[3개 segmentation loss + contrastive loss]
+    L --> M[AMP backward + SGD step]
+    M --> N[validation metrics]
+    N --> O[checkpoint-last]
+    N --> P{macro F1 개선?}
+    P -->|yes| Q[checkpoint-best]
+```
+
+실행 entry point는
+[`main()`](train_bcenet_map_ortho.py#L440-L670)이다.
+
+```text
+main
+ ├─ make_loader(split="train")       -> train 800장
+ ├─ make_loader(split="val")         -> validation 100장
+ ├─ make_visual_dataset(split="val") -> 고정 정성 샘플
+ ├─ build_model()                    -> CDResWHU.Baseline34
+ ├─ BCENetCriterion(LossConfig)
+ ├─ SGD + CosineAnnealingLR + GradScaler
+ └─ epoch loop
+     ├─ run_epoch(train)
+     ├─ run_epoch(validation)
+     ├─ metric와 JSONL 기록
+     ├─ checkpoint-last 저장
+     ├─ macro F1 개선 시 checkpoint-best 저장
+     └─ curve와 qualitative PNG 저장
+```
+
+test 100장은 이 실행 흐름에 들어가지 않는다. 현재 trainer에는 test
+evaluation이나 전체 1024 inference entry point가 아직 없다.
+
+## 3.2 dataset 코드가 만드는 실제 tensor
+
+구현 위치:
+
+- [`MapOrthoBCENetDataset`](dataset/bcenet_map_ortho.py#L184-L329)
+- [`derive_targets_and_weights`](dataset/bcenet_map_ortho.py#L106-L181)
+- [`make_loader`](train_bcenet_map_ortho.py#L284-L314)
+
+`__getitem__`은 한 manifest row에 대해 다음을 수행한다.
+
+```text
+1. before RGB image, after footprint mask, state label을 읽는다.
+2. 세 파일의 공간 크기가 같은지 확인한다.
+3. 1024×1024에서 512×512를 crop한다.
+   - train: 중앙 위치에서 x/y 각각 최대 128 pixel jitter
+   - validation: 정확한 중앙 crop
+4. BGR을 RGB로 바꾼다.
+5. train이면 image/mask/label에 동일한 flip/rotation을 적용한다.
+6. image에만 brightness/contrast 변환을 적용한다.
+7. state label과 footprint로 branch target과 loss weight를 만든다.
+8. image를 float [0,1], mask와 target을 float tensor로 변환한다.
+```
+
+target 생성 코드는 다음 식을 그대로 구현한다.
+
+```python
+reference = map_mask > 0
+unchanged = state_label == 1
+omission = state_label == 2
+excess = state_label == 3
+existing = unchanged | omission
+
+target_existing = existing
+target_new_head = omission
+target_removed_head = excess
+```
+
+각 batch가 model과 criterion에 제공하는 핵심 tensor:
+
+| key | 예상 shape | 의미 |
+|---|---|---|
+| `image` | `[B,3,512,512]` | before RGB |
+| `reference_mask` | `[B,512,512]` | after footprint, class 1 or 3 |
+| `target_existing` | `[B,1,512,512]` | class 1 or 2 |
+| `target_new_head` | `[B,1,512,512]` | omission, class 2 |
+| `target_removed_head` | `[B,1,512,512]` | excess, class 3 |
+| `weight_existing` | `[B,1,512,512]` | existing loss 신뢰도 |
+| `weight_new_head` | `[B,1,512,512]` | omission loss 신뢰도 |
+| `weight_removed_head` | `[B,1,512,512]` | excess loss 신뢰도 |
+
+quality weight는 target과 별개의 tensor다.
+
+```text
+기본 픽셀                         = 1.0
+2-pixel common boundary           = 0.25
+구조적으로 모순된 픽셀            = 0.0
+crop 중심 객체가 아닌 변화 픽셀   = 최대 0.5
+```
+
+즉 current code는 라벨을 지우거나 수정하지 않고, 의심 픽셀이 loss에
+기여하는 정도를 줄인다.
+
+## 3.3 `Baseline34.forward`가 계산하는 실제 branch
+
+구현 위치:
+
+- [`New_Fusion`](Testmodel/CDResWHU.py#L602-L640)
+- [`Baseline34.__init__`](Testmodel/CDResWHU.py#L1215-L1269)
+- [`Baseline34.forward`](Testmodel/CDResWHU.py#L1271-L1339)
+
+model 호출:
+
+```python
+outputs = model(image, reference_mask)
+```
+
+### 공통 encoder
+
+```python
+e11, e12, e13, e14 = self.resnet_features(image)
+```
+
+ResNet34의 네 해상도 feature를 각각 convolution과 batch normalization에
+통과시킨다. 이후 두 decoder 경로가 이 feature들을 사용한다.
+
+### new/omission 경로
+
+`New_Fusion`은 multi-level feature를 위로 복원한 뒤 reference를
+convolution으로 축소하여 background-side feature를 만든다.
+
+```python
+lab = self.conv_lab(reference.unsqueeze(1))
+backfeat = decoded_feature * (1 - lab)
+```
+
+`Baseline34.forward`에서는 다음 순서다.
+
+```python
+fu_new, featn = self.fusin(e1, e2, e3, e4, reference)
+fu_new = self.sel(fu_new)
+fu_new = self.dcn(fu_new.float())
+new_out = self.conv_lab2(self.bnorm2(self.conv_lab1(fu_new)))
+```
+
+`new_out`은 논문 이름과 달리 현재 데이터에서는
+`target_new_head=omission/class 2`로 학습된다.
+
+### existing 경로
+
+별도 decoder가 ResNet feature를 순차적으로 upsample/concatenate하고
+SE attention과 DCN을 적용한다.
+
+```python
+d4f = self.sel(decoded_full_feature)
+d4f = self.dcn(d4f.float())
+d4 = interpolate(self.norm4(d4f), input_size)
+existing_out = self.finalseg(d4)
+```
+
+`existing_out`은 `class 1 or class 2`로 supervision된다. 이 auxiliary
+building task가 변화 label만 보지 않고 영상의 building semantics를
+encoder에 주입한다.
+
+### removed/excess 경로
+
+removed output은 DCN을 지난 full feature의 building probability를
+뒤집고 reference 내부만 남긴 뒤 convolution한다.
+
+```python
+removed_out = self.finalmov(
+    (1 - torch.sigmoid(d4)) * reference.unsqueeze(1)
+)
+```
+
+따라서 reference에는 있지만 영상 feature가 building이라고 보지 않는
+영역을 높은 removed 후보로 만든다. 현재 데이터에서는
+`target_removed_head=excess/class 3`로 학습된다.
+
+### contrastive feature 출력
+
+```python
+feat_all = interpolate(self.segblock(d4f), input_size)
+feat_mov = interpolate(self.segblock(featn), input_size)
+
+return existing_out, removed_out, new_out, feat_all, feat_mov
+```
+
+실제 output 5개의 shape는 모두 `[B,1,512,512]`다. trainer와 loss에서는
+마지막 두 개를 `feature_all`, `feature_split`으로 부른다.
+
+여기서 중요한 검증 한계가 생긴다. 논문은 `F`, `F_BG`, `F_FG` 세 역할을
+정의하지만 model은 contrastive 계산용으로 두 tensor만 반환한다.
+현재 criterion은 이 한 pair를 omission과 excess에 모두 사용한다.
+더 구체적으로 `New_Fusion`은 `(backfeat, outf)`를 반환하지만
+`Baseline34`의 `featn`에는 두 번째 값인 mask 적용 전 `outf`가 들어간다.
+따라서 `feat_mov = segblock(featn)`을 이름만으로 `F_BG` 또는 `F_FG`라고
+간주할 수 없다.
+
+## 3.4 current loss의 실제 계산
+
+구현 위치:
+
+- [`weighted_pixel_loss`](utils/bcenet_loss.py#L24-L52)
+- [`weighted_dice_loss`](utils/bcenet_loss.py#L55-L73)
+- [`instance_contrastive_loss`](utils/bcenet_loss.py#L99-L185)
+- [`BCENetCriterion`](utils/bcenet_loss.py#L202-L274)
+
+criterion은 model output을 다음처럼 해석한다.
+
+```python
+existing, removed, new, feature_all, feature_split = outputs
+```
+
+그리고 target을 다음처럼 연결한다.
+
+```text
+existing <-> target_existing
+removed  <-> target_removed_head = excess
+new      <-> target_new_head = omission
+```
+
+### 완료 실행의 GCE
+
+logit을 `z`, target을 `y`, sigmoid probability를 `p`라고 하면:
+
+```text
+p_t = y p + (1-y)(1-p)
+GCE(z,y) = (1 - p_t^q) / q
+q = 0.7
+```
+
+양성 class weight와 quality weight를 결합한다.
+
+```text
+class_weight = 1 + y (positive_weight - 1)
+effective_weight = quality_weight × class_weight
+
+L_pixel =
+  Σ(effective_weight × GCE)
+  / Σ(effective_weight)
+```
+
+omission/excess의 `positive_weight=4`이므로 양성 픽셀은 같은 quality의
+음성 픽셀보다 4배 큰 weight를 가진다. `--pixel-loss bce`를 선택하면
+같은 weighting 구조에서 GCE 대신 BCEWithLogits를 사용한다.
+
+### weighted Dice
+
+현재 구현의 sample별 Dice loss:
+
+```text
+L_Dice =
+  1 - (2 Σ(w p y) + 1)
+      / (Σ(w p) + Σ(w y) + 1)
+```
+
+각 branch segmentation loss:
+
+```text
+L_existing = L_pixel_existing + L_Dice_existing
+L_removed  = L_pixel_removed  + L_Dice_removed
+L_new      = L_pixel_new      + L_Dice_new
+```
+
+### current instance contrastive
+
+각 batch sample과 변화 target에 대해:
+
+```text
+1. target의 8-connected component를 찾는다.
+2. area < 16이면 제외한다.
+3. component 내부 quality 평균 < 0.5이면 제외한다.
+4. component bounding rectangle를 구한다.
+5. rectangle 안에서도 component pixel만 feature vector로 선택한다.
+6. feature_all과 feature_split에 sigmoid를 적용한다.
+7. 두 vector의 cosine similarity D를 계산한다.
+```
+
+term:
+
+```text
+omission/new component:   0.5 × (1 - D)
+excess/removed component: 0.5 × (1 + D)
+```
+
+모든 omission/excess component term을 한 list에 넣어 단순 평균한다.
+
+```text
+L_contrastive = mean(all component terms)
+```
+
+최종 loss:
+
+```text
+L_total =
+  L_existing
+  + L_removed
+  + L_new
+  + contrastive_weight × L_contrastive
+```
+
+완료 실행의 `contrastive_weight=1`이다.
+
+## 3.5 backward, metric, checkpoint 코드
+
+구현 위치:
+
+- [`run_epoch`](train_bcenet_map_ortho.py#L195-L280)
+- [`save_checkpoint`](train_bcenet_map_ortho.py#L412-L437)
+- [epoch loop](train_bcenet_map_ortho.py#L536-L670)
+
+train batch:
+
+```python
+optimizer.zero_grad(set_to_none=True)
+with autocast(float16):
+    outputs = model(image, reference)
+    loss, details = criterion(outputs, batch)
+scaler.scale(loss).backward()
+scaler.step(optimizer)
+scaler.update()
+```
+
+DCNv2 호출 내부에서만 autocast를 끄고 FP32로 변환한다. validation은 같은
+forward와 criterion을 사용하지만 gradient와 optimizer step을 끈다.
+
+metric 계산:
+
+```python
+existing_prediction = sigmoid(existing_logit) >= 0.5
+omission_prediction = sigmoid(new_logit) >= 0.5
+excess_prediction = sigmoid(removed_logit) >= 0.5
+combined_change = omission_prediction | excess_prediction
+```
+
+각각 TP/FP/FN을 누적해 precision, recall, F1, IoU를 계산한다.
+
+best selection:
+
+```text
+macro_change_f1 = (omission_f1 + excess_f1) / 2
+```
+
+- 매 epoch `checkpoint-last.pth`를 덮어쓴다.
+- macro F1이 이전 최고보다 클 때만 `checkpoint-best.pth`를 덮어쓴다.
+- omission 또는 excess prediction rate가 3 epoch 연속 `1e-5` 이하이면
+  branch collapse로 보고 중단한다.
+- cosine scheduler는 epoch마다 한 번 step한다.
+
+## 3.6 완료 실행에서 코드가 받은 실제 설정
+
+`training_monitor/current/config.json` 기준:
+
+```text
+model_variant=whu
+init_checkpoint=checkpoint-best-whu.pth
+epochs=100
+batch_size=4
+crop_size=512
+train_jitter=128
+lr=0.001
+momentum=0.9
+weight_decay=0.0001
+scheduler=cosine
+pixel_loss=gce
+gce_q=0.7
+pixel_loss_weight=1
+dice_weight=1
+contrastive_weight=1
+contrastive_min_area=16
+positive_weight_existing=1
+positive_weight_new=4
+positive_weight_removed=4
+boundary_width=2
+boundary_weight=0.25
+secondary_change_weight=0.5
+threshold=0.5
+seed=1024
+AMP=true
+best_metric=macro_change_f1
+```
+
+따라서 이후 절의 논문 대응 판정은 추상적인 설계 추정이 아니라, 위
+실행 흐름과 실제 config를 기준으로 한다.
+
 ## 4. 입력 방향과 branch 의미
 
 ### 4.1 논문 정의
