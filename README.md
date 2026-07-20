@@ -41,6 +41,11 @@ The full training design, label-to-branch mapping, noisy-label strategy,
 metric interpretation, and qualitative review checklist are documented in
 [TRAINING_DESIGN.md](TRAINING_DESIGN.md).
 
+The paper-to-code fidelity audit is documented in
+[PAPER_IMPLEMENTATION_ALIGNMENT.md](PAPER_IMPLEMENTATION_ALIGNMENT.md).
+For continuing the work in a new Codex session, start with
+[SESSION_HANDOFF.md](SESSION_HANDOFF.md).
+
 ```bash
 cd /home/work/projects/BCE-Net
 
