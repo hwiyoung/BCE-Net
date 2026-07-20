@@ -1,6 +1,6 @@
 # BCE-Net Korea PoC Dashboard
 
-Last updated: 2026-07-15
+Last updated: 2026-07-16
 
 ## Current Mode
 
@@ -55,7 +55,7 @@ See [ENVIRONMENT.md](ENVIRONMENT.md) for setup and session reuse details.
 | Stage 9C | ✅ 완료 | Threshold analysis and review package | 225 threshold combinations and 50 top-candidate quicklooks created. |
 | Stage 9D | ✅ 완료 | Stratified qualitative inference | 100 tiles, 0.3765 km²; QGIS review package created. |
 | Stage 10B | 🕓 대기 | Reviewed object-level evaluation | Waiting for human review labels; no precision/recall/F1 yet. |
-| Full AOI | ⏸ 보류 | Production-scale candidate generation | Hold until qualitative review is accepted. |
+| Full AOI | 🟢 승인 | Production-scale candidate generation | 1% 샘플링 제한 해제; 약 19,071–19,375 타일 전체 실행 가능. |
 
 ## Stage 9D Result
 
@@ -78,7 +78,7 @@ See [ENVIRONMENT.md](ENVIRONMENT.md) for setup and session reuse details.
 - Review `candidate_excess_review_threshold` first in QGIS.
 - Review `tile_missing_search` to assess sparse MISSING behavior.
 - Do not calculate accuracy metrics until review labels exist.
-- Do not run full-AOI inference until qualitative review is accepted.
+- Full-AOI inference is authorized; keep outputs classified as unreviewed candidates.
 - Do not upload raw geospatial imagery or reviewer quicklooks externally.
 
 ## Active Risks
@@ -89,7 +89,7 @@ See [ENVIRONMENT.md](ENVIRONMENT.md) for setup and session reuse details.
 | Base image ABI change | ⚠️ 감시 | `make setup` rebuilds DCNv2 when the existing extension no longer imports. |
 | WHU-only pretrained weight | ⚠️ 위험 | Korea imagery has a domain gap; SIBU weight is unavailable. |
 | Human review labels | 🕓 대기 | Current review CSVs remain unreviewed. |
-| Full-AOI readiness | ⏸ 보류 | Qualitative acceptance is required first. |
+| Full-AOI readiness | 🟢 승인 | Sampling gate removed; production-scale compute and storage must still be monitored. |
 | Candidate interpretation | ✅ 통제 | Outputs are candidates, not confirmed errors or accuracy evidence. |
 
 ## Next Gate
