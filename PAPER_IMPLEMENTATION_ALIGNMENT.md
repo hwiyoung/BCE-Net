@@ -134,14 +134,18 @@ Formula (7)의 feature 구성과 동일하지 않다.**
 - Formula (7)의 정확한 재현
 - random sample generator의 효과
 - DCN/contrastive 각각의 독립 효과
-- untouched test 100장의 일반화 성능
+- 1024 sliding-window/full-tile test 일반화 성능
 - 논문 SI-BU/WHU 수치의 재현
 
 ## 다음 검증 순서
 
-1. `checkpoint-best.pth`로 test 100장 독립 평가
-2. `F`, `F_BG`, `F_FG`를 명시적으로 반환하도록 contrastive output 수정
-3. Formula (7)의 클래스별 평균과 bounding-box patch 계산 구현
-4. random sample generator와 scaling augmentation 구현
-5. polygon 평균 probability와 regularization 구현
-6. baseline/RSG/contrastive/DCN/robust-loss ablation 수행
+1. `checkpoint-best.pth`로 test 100장 중앙 512 crop frozen 평가 (완료,
+   spatial overlap 제한은 `TEST_EVALUATION_REPORT.md` 참고)
+2. source footprint에 256px buffer를 둔 spatial split v2 설계 (완료)
+3. 현재 robust baseline을 v2에서 재학습하고 frozen test 평가 (완료,
+   test macro F1 `0.722276`)
+4. `F`, `F_BG`, `F_FG`를 명시적으로 반환하도록 contrastive output 수정
+5. Formula (7)의 클래스별 평균과 bounding-box patch 계산 구현
+6. random sample generator와 scaling augmentation 구현
+7. polygon 평균 probability와 regularization 구현
+8. split v2에서 baseline/RSG/contrastive/DCN/robust-loss ablation 수행

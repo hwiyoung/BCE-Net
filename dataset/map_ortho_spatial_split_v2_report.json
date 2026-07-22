@@ -1,0 +1,209 @@
+{
+  "protocol": "map-ortho-buffered-spatial-split-v2",
+  "source_manifest": {
+    "path": "/home/work/projects/BCE-Net/dataset/map_ortho_manifest.csv",
+    "sha256": "1d3a9f482a2fc01a5d5142449458015760085ecd871b9ca5ea13ad3e6f9bdf2c"
+  },
+  "patches_csv": {
+    "path": "/home/work/data/change_detection/building/map-ortho/patches.csv",
+    "sha256": "36fa4ba44b5a93401681b75a9912b6ae70b3b3692b862bb9243e687485b52f4f"
+  },
+  "output_manifest": {
+    "path": "/home/work/projects/BCE-Net/dataset/map_ortho_manifest_spatial_v2.csv",
+    "sha256": "6f02a09a1a07754b698b50f45c1d9418f101a3adc620df544ad01eb983994567"
+  },
+  "seed": 1024,
+  "buffer_pixels": 256,
+  "buffer_meters": 30.72,
+  "buffer_definition": "Two 1024 source rectangles are connected when they overlap, or when both axis-aligned gaps are smaller than buffer_pixels.",
+  "candidate_buffers": {
+    "0": {
+      "components": 313,
+      "overlap_edges": 1713,
+      "buffer_only_edges": 0,
+      "largest_component_samples": 66,
+      "largest_component_fraction": 0.066,
+      "top_10_component_sizes": [
+        66,
+        30,
+        26,
+        25,
+        24,
+        20,
+        20,
+        19,
+        19,
+        16
+      ],
+      "singleton_components": 151
+    },
+    "128": {
+      "components": 267,
+      "overlap_edges": 1713,
+      "buffer_only_edges": 295,
+      "largest_component_samples": 73,
+      "largest_component_fraction": 0.073,
+      "top_10_component_sizes": [
+        73,
+        37,
+        30,
+        26,
+        25,
+        24,
+        23,
+        22,
+        20,
+        20
+      ],
+      "singleton_components": 117
+    },
+    "256": {
+      "components": 215,
+      "overlap_edges": 1713,
+      "buffer_only_edges": 607,
+      "largest_component_samples": 73,
+      "largest_component_fraction": 0.073,
+      "top_10_component_sizes": [
+        73,
+        49,
+        39,
+        39,
+        30,
+        30,
+        27,
+        24,
+        24,
+        22
+      ],
+      "singleton_components": 91
+    },
+    "512": {
+      "components": 140,
+      "overlap_edges": 1713,
+      "buffer_only_edges": 1263,
+      "largest_component_samples": 276,
+      "largest_component_fraction": 0.276,
+      "top_10_component_sizes": [
+        276,
+        73,
+        72,
+        31,
+        29,
+        24,
+        23,
+        23,
+        20,
+        19
+      ],
+      "singleton_components": 58
+    },
+    "1024": {
+      "components": 78,
+      "overlap_edges": 1713,
+      "buffer_only_edges": 2804,
+      "largest_component_samples": 544,
+      "largest_component_fraction": 0.544,
+      "top_10_component_sizes": [
+        544,
+        75,
+        40,
+        26,
+        23,
+        19,
+        19,
+        15,
+        12,
+        12
+      ],
+      "singleton_components": 26
+    }
+  },
+  "selected_components": {
+    "components": 215,
+    "overlap_edges": 1713,
+    "buffer_only_edges": 607,
+    "largest_component_samples": 73,
+    "largest_component_fraction": 0.073,
+    "top_10_component_sizes": [
+      73,
+      49,
+      39,
+      39,
+      30,
+      30,
+      27,
+      24,
+      24,
+      22
+    ],
+    "singleton_components": 91
+  },
+  "assignment_optimizer": {
+    "success": false,
+    "status": 1,
+    "message": "Time limit reached. (HiGHS Status 13: Time limit reached)",
+    "objective": 0.031064088280113145,
+    "mip_gap": 0.9999743545733139
+  },
+  "splits": {
+    "train": {
+      "samples": 800,
+      "components": 146,
+      "center_omission_samples": 372,
+      "center_excess_samples": 428,
+      "center_omission_target_rate": 0.05459481716156006,
+      "center_excess_target_rate": 0.04684800624847412,
+      "center_combined_target_rate": 0.10144282341003417
+    },
+    "val": {
+      "samples": 100,
+      "components": 46,
+      "center_omission_samples": 46,
+      "center_excess_samples": 54,
+      "center_omission_target_rate": 0.05591041564941406,
+      "center_excess_target_rate": 0.04694664001464844,
+      "center_combined_target_rate": 0.1028570556640625
+    },
+    "test": {
+      "samples": 100,
+      "components": 23,
+      "center_omission_samples": 47,
+      "center_excess_samples": 53,
+      "center_omission_target_rate": 0.054137077331542965,
+      "center_excess_target_rate": 0.04720050811767578,
+      "center_combined_target_rate": 0.10133758544921875
+    }
+  },
+  "cross_split_checks": {
+    "train_val": {
+      "source1024_overlap_pairs": 0,
+      "buffer_violations": 0,
+      "center512_overlap_pairs": 0,
+      "train_possible_union_vs_held_center_pairs": 0
+    },
+    "train_test": {
+      "source1024_overlap_pairs": 0,
+      "buffer_violations": 0,
+      "center512_overlap_pairs": 0,
+      "train_possible_union_vs_held_center_pairs": 0
+    },
+    "val_test": {
+      "source1024_overlap_pairs": 0,
+      "buffer_violations": 0,
+      "center512_overlap_pairs": 0,
+      "train_possible_union_vs_held_center_pairs": 0
+    },
+    "totals": {
+      "source1024_overlap_pairs": 0,
+      "buffer_violations": 0
+    }
+  },
+  "integrity": {
+    "rows": 1000,
+    "duplicate_sample_ids": 0,
+    "duplicate_image_paths": 0,
+    "duplicate_map_paths": 0,
+    "duplicate_label_paths": 0,
+    "components_shared_across_splits": 0
+  }
+}

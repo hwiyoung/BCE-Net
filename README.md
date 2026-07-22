@@ -45,6 +45,21 @@ The paper-to-code fidelity audit is documented in
 [PAPER_IMPLEMENTATION_ALIGNMENT.md](PAPER_IMPLEMENTATION_ALIGNMENT.md).
 For continuing the work in a new Codex session, start with
 [SESSION_HANDOFF.md](SESSION_HANDOFF.md).
+The frozen baseline's file-disjoint center-crop test result and the Formula
+(7) implementation plan are documented in
+[TEST_EVALUATION_REPORT.md](TEST_EVALUATION_REPORT.md).
+The later overlap audit found exact pixels shared across spatial-group
+boundaries, so the current test result is not a strict spatial-independent
+generalization result. Evidence is available at
+`training_monitor/test-split-overlap-audit-20260722/`.
+The canonical blinded qualitative audit for all 100 test samples is available
+at `training_monitor/test-audit-full100-v1-20260722/`.
+
+The buffered spatial split v2, retrained robust baseline, and leakage-free
+cross-split test are documented in
+[SPATIAL_V2_BASELINE_REPORT.md](SPATIAL_V2_BASELINE_REPORT.md). The v2 test
+macro omission/excess F1 is `0.722276` on the central 512 crop. This remains a
+noisy-label robust baseline and is not the exact paper reproduction.
 
 ```bash
 cd /home/work/projects/BCE-Net
@@ -79,6 +94,17 @@ five epochs, and after the final epoch under `qualitative/`.
 The repository-local `training_monitor/current` link exposes the active run
 inside VS Code Explorer even though checkpoints and images are stored under
 `/home/work/models`.
+
+The frozen test evaluator fixes the split to `test`, the central crop to
+512×512, and the threshold to 0.5. It rejects non-best checkpoints and
+non-empty output directories. File disjointness does not by itself guarantee
+spatial disjointness:
+
+```bash
+./scripts/run_in_env.sh python evaluate_bcenet_map_ortho.py \
+  --checkpoint /home/work/models/BCE-Net/map-ortho-robust-v2-20260720/checkpoint-best.pth \
+  --output-dir /home/work/models/BCE-Net/map-ortho-robust-v2-test-center512-best-e24-20260721
+```
 
 ## Results
 <div align=center><img width="410" height="490" src="https://github.com/liaochengcsu/BCE-Net/blob/main/pics/figure12.png" title="results on sibu dataset"><img width="410" height="490" src="https://github.com/liaochengcsu/BCE-Net/blob/main/pics/figure14.png" title="results on whu-cd dataset"></div>
